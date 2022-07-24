@@ -1,1 +1,1 @@
-https://git.heroku.com/phonebook-hieunguyen.git
+https://phonebook-hieunguyen.herokuapp.com/
