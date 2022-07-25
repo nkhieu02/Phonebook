@@ -6,18 +6,22 @@ const app = express();
 const Person = require("./database/phonebook_data")
 const cors = require('cors');
 const unknownEndpoint = (request, response) => {
-    console.log(error);
     response.status(404).send({ error: 'unknown endpoint' })
   }
 const errorHandler = (error, request, response, next) => {
     console.log(error.message);
-    if (error.name === 'CastError') { 
+    if (error.name === 'CastError') {
         return response.status(400).send({ error: 'malformatted id' })
     }
+    else if (error.name === 'ValidationError') { 
+        return response.status(400).send({error: error.message})
+    }
+    next(error)
   }
 app.use(cors());
 app.use(express.static('build'));
 app.use(express.json())
+/*
 let notes = [
     { 
       "id": 1,
@@ -40,7 +44,7 @@ let notes = [
       "number": "39-23-6423122"
     }
 ]
-
+*/
 morgan.token('person', (req) => { 
     if (req.method === "POST") { 
         return (
@@ -58,14 +62,18 @@ app.get('/api/persons/', (request, response, next) => {
         })
     .catch(error => next(error))
 })
-/*
+
 app.get('/info', (req, res) => { 
     const time = new Date();
-    const element = `<p> Phonebook has info for ${notes.length} people </p>
+    Person
+        .count({})
+        .then((result) => { 
+            const element = `<p> Phonebook has info for ${result} people </p>
                       <p>${time} </p>`
-    res.send(element)
+            res.send(element)
+        })
 })
-*/
+
 app.get('/api/persons/:id', (req, res, next) => { 
     const id = req.params.id;
     console.log(id);
@@ -92,7 +100,7 @@ app.delete('/api/persons/:id', (req,res,next) => {
     console.log(id);
     Person
         .findByIdAndRemove(id)
-        .then((result) => { 
+        .then(() => { 
             res.status(204).end()
         })
         .catch((error) => { 
@@ -100,25 +108,21 @@ app.delete('/api/persons/:id', (req,res,next) => {
         })
 })
 
-app.post('/api/persons', (req, res) => { 
+app.post('/api/persons', (req, res, next) => { 
     const person = req.body;
-    console.log()
-    if (person.name && person.number) { 
-        const newPerson = new Person({
-            name: person.name,
-            number: person.number,
-        })
-        return (
-            newPerson.save().then(
-                savedNote => {
-                    console.log(`Add person with id: ${savedNote._id.toString()}`)
-                    res.json(savedNote)
-                }
-            )
-        )
-
-    }
-    res.status(400).send({ error: 'Content is missing' });
+    const newPerson = new Person({            
+        name: person.name,        
+        number: person.number,           
+    })   
+    newPerson
+        .save()
+        .then(                
+        savedNote => {            
+            console.log(`Add person with id: ${savedNote._id.toString()}`)            
+            res.json(savedNote)           
+            })
+        .catch(error => next(error))
+        
 })
 app.put('/api/persons/:id', (req, res, next) => { 
     const body = req.body;
@@ -127,7 +131,7 @@ app.put('/api/persons/:id', (req, res, next) => {
         number: body.number,
     }
     Person
-        .findByIdAndUpdate(req.params.id, updateInfor, { new: true })
+        .findByIdAndUpdate(req.params.id, updateInfor, { new: true, runValidator: true, context: 'query' })
         .then(newInfo => { 
             res.json(newInfo);
         })
